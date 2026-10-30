@@ -1,3 +1,6 @@
-piper-tts==1.8.0
 fastapi
-uvicorn
+uvicorn[standard]
+pydantic
+kokoro-onnx
+misaki-fork[en]
+soundfile

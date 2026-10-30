@@ -1,97 +1,54 @@
-# Matheus Piper TTS
+# Matheus Kokoro TTS — teste pm_alex
 
-Serviço independente de síntese de voz para o **Matheus AI**, usando Piper TTS em CPU e a voz brasileira `pt_BR-faber-medium`.
+Branch experimental para avaliar a voz masculina brasileira `pm_alex` do Kokoro-82M. A branch `main` permanece intacta com o serviço Piper atual.
 
-Este repositório substitui a implementação anterior baseada em Kokoro-FastAPI. A integração com o backend principal do Matheus AI é uma etapa separada.
+## Modelo e voz
 
-## Stack
+- Motor: Kokoro-82M via `kokoro-onnx`
+- Voz: `pm_alex` (masculina, português brasileiro)
+- Idioma/G2P: `pt-br` via Misaki/espeak-ng
+- Modelo: FP16, 163.527.961 bytes (~163,5 MB)
+- Pacote de embeddings: `voices-v1.0.bin`, 28.214.398 bytes (~28,2 MB)
+- Total dos dois artefatos: ~191,7 MB
+- Saída: WAV PCM 16-bit
+- API compatível com `POST /v1/audio/speech`
 
-- Python 3.11
-- Piper TTS 1.8.0
-- ONNX Runtime em CPU
-- FastAPI + Uvicorn
-- Voz: `pt_BR-faber-medium`
-- Saída: WAV
+Os arquivos são baixados durante o build e verificados por SHA-256. O arquivo de vozes contém vários perfis; o servidor só seleciona `pm_alex`.
 
-## Deploy no Render
+## Deploy experimental no Render
 
-1. Crie um Web Service conectado a este repositório.
-2. Selecione **Docker** como runtime.
-3. Use a branch `main`.
-4. Escolha inicialmente o plano Free.
-5. Adicione a variável de ambiente `PIPER_API_KEY` com uma chave longa e aleatória.
-6. Faça o deploy.
+Crie um Web Service separado (ou um serviço de teste) apontando para esta branch:
 
-O Dockerfile baixa o modelo e o arquivo de configuração correspondente durante o build. O serviço escuta na porta definida pela variável `PORT` (Render fornece essa variável automaticamente).
+`test/kokoro-pm-alex`
 
-### Limites do plano gratuito
+Runtime: Docker. Plano Free pode não ter memória suficiente para o modelo e as dependências durante a inferência; confirme o consumo nos logs e métricas. Não substitua o serviço Piper de produção antes de validar o teste.
 
-O Render Free possui 512 MB de RAM e pode suspender serviços sem tráfego. Piper é uma alternativa mais leve que Kokoro, mas o consumo real desta imagem precisa ser confirmado nos logs e métricas do próprio Render. Se ocorrer encerramento por memória, não tente aumentar concorrência: será necessário reduzir dependências/modelo ou usar outro plano/host.
+Variáveis opcionais:
+- `TTS_API_KEY`: chave Bearer para proteger o endpoint.
+- `KOKORO_SPEED`: velocidade padrão (1.0).
 
 ## Endpoints
 
-### Health check
+- `GET /`: informações do serviço
+- `GET /health`: estado do carregamento
+- `POST /v1/audio/speech`: gera WAV
+- `GET /docs`: documentação OpenAPI
 
-`GET /health`
-
-Resposta esperada:
-
-```json
-{
-  "status": "ok",
-  "engine": "piper",
-  "voice": "pt_BR-faber-medium"
-}
-```
-
-### Gerar áudio
-
-`POST /v1/audio/speech`
-
-Cabeçalhos:
-
-```
-Content-Type: application/json
-Authorization: Bearer SUA_CHAVE
-```
-
-Corpo:
-
-```json
-{
-  "model": "piper",
-  "input": "Olá! Esta é a voz do Matheus AI.",
-  "voice": "pt_BR-faber-medium",
-  "response_format": "wav"
-}
-```
-
-Exemplo cURL:
+Exemplo:
 
 ```bash
 curl -X POST "https://SEU-SERVICO.onrender.com/v1/audio/speech" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer SUA_CHAVE" \
-  -d '{"model":"piper","input":"Olá! Esta é a voz do Matheus AI.","voice":"pt_BR-faber-medium","response_format":"wav"}' \
-  --output teste.wav
+  -d '{"model":"kokoro","input":"Olá! Eu sou o Matheus AI. Como posso ajudar você hoje?","voice":"pm_alex","response_format":"wav","speed":1.0}' \
+  --output teste-pm-alex.wav
 ```
 
-A documentação interativa fica em `/docs`.
+A chave é opcional no serviço, mas recomendada em produção. Não coloque segredos no GitHub nem no frontend.
 
-## Variáveis de ambiente
+## Segurança e estabilidade
 
-| Nome | Obrigatória | Descrição |
-|---|---|---|
-| `PORT` | Não | Porta HTTP; padrão 10000 |
-| `PIPER_API_KEY` | Recomendada | Token Bearer para proteger a geração |
-| `PIPER_MODEL_PATH` | Não | Caminho do arquivo ONNX |
-
-Não coloque a chave no frontend nem no GitHub. Guarde-a somente nas variáveis de ambiente do Render e do backend do Matheus AI.
-
-## Observações
-
-- O endpoint aceita textos de até 4.000 caracteres por solicitação.
-- Por segurança de memória e estabilidade, a síntese é serializada (uma requisição de áudio por vez).
-- A implementação retorna WAV; MP3 ainda não está habilitado.
-- O modelo ONNX e seu arquivo `.onnx.json` correspondente são necessários.
-- O motor Piper é distribuído sob GPL-3.0-or-later. Verifique as obrigações da licença antes de distribuir uma versão modificada ou incorporá-la a uma oferta comercial.
+- Um worker e uma síntese por vez para limitar memória.
+- Limite de 3.000 caracteres por requisição.
+- Velocidade permitida: 0,7 a 1,3.
+- O serviço Piper em `main` não é alterado por esta branch.
