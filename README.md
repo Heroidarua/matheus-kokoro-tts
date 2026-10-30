@@ -1,54 +1,60 @@
-# Matheus Kokoro TTS — teste pm_alex
+# ADA-M Original Voice — Qwen3-TTS
 
-Branch experimental para avaliar a voz masculina brasileira `pm_alex` do Kokoro-82M. A branch `main` permanece intacta com o serviço Piper atual.
+Serviço separado para a identidade vocal original da ADA-M. A branch `main` (Piper) e a branch `test/kokoro-pm-alex` permanecem preservadas.
 
-## Modelo e voz
+## Perfil vocal
 
-- Motor: Kokoro-82M via `kokoro-onnx`
-- Voz: `pm_alex` (masculina, português brasileiro)
-- Idioma/G2P: `pt-br` via Misaki/espeak-ng
-- Modelo: FP16, 163.527.961 bytes (~163,5 MB)
-- Pacote de embeddings: `voices-v1.0.bin`, 28.214.398 bytes (~28,2 MB)
-- Total dos dois artefatos: ~191,7 MB
-- Saída: WAV PCM 16-bit
-- API compatível com `POST /v1/audio/speech`
+- Nome interno: `ada-m-original-ptbr`
+- Voz masculina adulta, registro médio-grave natural
+- Estilo humano, conversacional, acolhedor e claro
+- Idioma: português brasileiro
+- Perfil definido por instrução fixa em `app.py`
+- Sem gravação ou clonagem de uma pessoa real
 
-Os arquivos são baixados durante o build e verificados por SHA-256. O arquivo de vozes contém vários perfis; o servidor só seleciona `pm_alex`.
+## Como a identidade é mantida
 
-## Deploy experimental no Render
+1. Qwen3-TTS VoiceDesign cria uma amostra de referência a partir da descrição vocal e de um texto fixo.
+2. O modelo VoiceDesign é descarregado da GPU.
+3. Qwen3-TTS Base 0.6B cria um prompt de voz reutilizável a partir da amostra.
+4. Todas as frases seguintes usam esse mesmo prompt, mantendo a identidade vocal consistente.
 
-Crie um Web Service separado (ou um serviço de teste) apontando para esta branch:
+Esse fluxo segue o método oficial “Voice Design then Clone” do projeto Qwen3-TTS. É uma identidade sintética desenhada para a ADA-M, não uma voz humana exclusiva treinada do zero.
 
-`test/kokoro-pm-alex`
+## Requisitos de implantação
 
-Runtime: Docker. Plano Free pode não ter memória suficiente para o modelo e as dependências durante a inferência; confirme o consumo nos logs e métricas. Não substitua o serviço Piper de produção antes de validar o teste.
+**Não implantar no Render Free.** Este serviço exige GPU NVIDIA com CUDA e memória suficiente para carregar os modelos durante a inicialização. Use um host GPU e mantenha um volume persistente em `/data` para o cache Hugging Face.
 
-Variáveis opcionais:
-- `TTS_API_KEY`: chave Bearer para proteger o endpoint.
-- `KOKORO_SPEED`: velocidade padrão (1.0).
+Runtime: Docker com acesso à GPU NVIDIA.
+
+Variáveis:
+- `TTS_API_KEY`: chave Bearer opcional (recomendada em produção).
+- `TTS_DEVICE`: padrão `cuda:0`.
+- `VOICE_DESIGN_MODEL`: padrão `Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign`.
+- `VOICE_CLONE_MODEL`: padrão `Qwen/Qwen3-TTS-12Hz-0.6B-Base`.
+- `HF_HOME`: padrão `/data/huggingface`.
+
+A primeira inicialização baixa os pesos dos modelos e cria a referência vocal; pode demorar vários minutos.
 
 ## Endpoints
 
-- `GET /`: informações do serviço
-- `GET /health`: estado do carregamento
-- `POST /v1/audio/speech`: gera WAV
-- `GET /docs`: documentação OpenAPI
+- `GET /health`
+- `GET /`
+- `POST /v1/audio/speech` — WAV
+- `POST /v1/audio/speech/stream` — SSE com WAV em base64
 
-Exemplo:
+O endpoint SSE mantém compatibilidade com o cliente ADA-M atual. Nesta primeira versão, cada evento contém o áudio da frase depois que a síntese daquela frase termina. O chat pode continuar gerando enquanto as frases são sintetizadas em sequência, mas a API Python de alto nível não entrega pacotes WAV decodificados em tempo real. Não considerar 97 ms como latência garantida do serviço completo.
+
+## Teste
 
 ```bash
-curl -X POST "https://SEU-SERVICO.onrender.com/v1/audio/speech" \
+curl https://SEU-SERVICO/health
+curl -X POST https://SEU-SERVICO/v1/audio/speech \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer SUA_CHAVE" \
-  -d '{"model":"kokoro","input":"Olá! Eu sou o Matheus AI. Como posso ajudar você hoje?","voice":"pm_alex","response_format":"wav","speed":1.0}' \
-  --output teste-pm-alex.wav
+  -d '{"model":"ada-m-original","input":"Olá! Eu sou a ADA-M. Como posso ajudar?","voice":"ada-m-original-ptbr","response_format":"wav"}' \
+  --output ada-m-voice.wav
 ```
 
-A chave é opcional no serviço, mas recomendada em produção. Não coloque segredos no GitHub nem no frontend.
+## Licença e origem
 
-## Segurança e estabilidade
-
-- Um worker e uma síntese por vez para limitar memória.
-- Limite de 3.000 caracteres por requisição.
-- Velocidade permitida: 0,7 a 1,3.
-- O serviço Piper em `main` não é alterado por esta branch.
+O modelo Qwen3-TTS VoiceDesign é publicado no Hugging Face com licença Apache-2.0. Consulte o repositório oficial QwenLM/Qwen3-TTS para instruções, versões e condições dos artefatos de modelo.
