@@ -106,13 +106,13 @@ async def generate_speech_stream(data: SpeechRequest, authorization: str = Heade
                     audio_buffer = io.BytesIO()
                     sf.write(audio_buffer, samples, sample_rate, format="WAV", subtype="PCM_16")
                     encoded = base64.b64encode(audio_buffer.getvalue()).decode("ascii")
-                    yield "data: " + json.dumps({"audio": encoded}, separators=(",", ":")) + "\\n\\n"
-            yield "event: done\\ndata: {}\\n\\n"
+                    yield "data: " + json.dumps({"audio": encoded}, separators=(",", ":")) + "\n\n"
+            yield "event: done\ndata: {}\n\n"
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.exception("Falha no streaming de áudio Kokoro")
-            yield "event: error\\ndata: {\"detail\":\"Falha ao sintetizar áudio.\"}\\n\\n"
+            yield "event: error\ndata: {\"detail\":\"Falha ao sintetizar áudio.\"}\n\n"
 
     return StreamingResponse(
         audio_events(),
