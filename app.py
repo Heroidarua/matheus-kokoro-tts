@@ -157,7 +157,7 @@ def health():
 @app.post("/v1/audio/speech")
 async def generate_speech(data: SpeechRequest, authorization: str = Header(default="")):
     _authorize(authorization)
-    if data.voice not in (VOICE_NAME, "ada-m-original", "alloy"):
+    if data.voice not in (VOICE_NAME, "ada-m-original", "pm_alex", "alloy"):
         raise HTTPException(status_code=400, detail=f"Voz indisponível. Use {VOICE_NAME}.")
     if not model_ready:
         raise HTTPException(status_code=503, detail="A voz original ainda está carregando.")
