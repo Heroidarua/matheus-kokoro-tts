@@ -1,75 +1,97 @@
-# Matheus Kokoro TTS
+# Matheus Piper TTS
 
-Servidor de síntese de voz do **Matheus AI**, baseado no [Kokoro-FastAPI](https://github.com/remsky/Kokoro-FastAPI) e preparado para execução em CPU no Render.
+Serviço independente de síntese de voz para o **Matheus AI**, usando Piper TTS em CPU e a voz brasileira `pt_BR-faber-medium`.
 
-## Configuração
+Este repositório substitui a implementação anterior baseada em Kokoro-FastAPI. A integração com o backend principal do Matheus AI é uma etapa separada.
 
-| Item | Valor |
-|---|---|
-| Host | `0.0.0.0` |
-| Porta | `10000` |
-| Dispositivo | CPU |
-| Modelo | `kokoro` |
-| Voz padrão | `pm_alex` |
-| Player web | Desativado |
+## Stack
+
+- Python 3.11
+- Piper TTS 1.8.0
+- ONNX Runtime em CPU
+- FastAPI + Uvicorn
+- Voz: `pt_BR-faber-medium`
+- Saída: WAV
 
 ## Deploy no Render
 
-1. Crie um **Web Service** usando este repositório.
-2. Selecione **Docker** como ambiente de execução.
-3. Use a porta interna `10000` (o Dockerfile já define `EXPOSE 10000`).
-4. Faça o deploy e aguarde o carregamento inicial do modelo.
+1. Crie um Web Service conectado a este repositório.
+2. Selecione **Docker** como runtime.
+3. Use a branch `main`.
+4. Escolha inicialmente o plano Free.
+5. Adicione a variável de ambiente `PIPER_API_KEY` com uma chave longa e aleatória.
+6. Faça o deploy.
 
-O serviço usa a imagem CPU oficial do Kokoro-FastAPI indicada no Dockerfile. Não é necessário configurar GPU.
+O Dockerfile baixa o modelo e o arquivo de configuração correspondente durante o build. O serviço escuta na porta definida pela variável `PORT` (Render fornece essa variável automaticamente).
 
-## API
+### Limites do plano gratuito
+
+O Render Free possui 512 MB de RAM e pode suspender serviços sem tráfego. Piper é uma alternativa mais leve que Kokoro, mas o consumo real desta imagem precisa ser confirmado nos logs e métricas do próprio Render. Se ocorrer encerramento por memória, não tente aumentar concorrência: será necessário reduzir dependências/modelo ou usar outro plano/host.
+
+## Endpoints
+
+### Health check
+
+`GET /health`
+
+Resposta esperada:
+
+```json
+{
+  "status": "ok",
+  "engine": "piper",
+  "voice": "pt_BR-faber-medium"
+}
+```
 
 ### Gerar áudio
 
 `POST /v1/audio/speech`
 
-Exemplo de corpo JSON:
+Cabeçalhos:
+
+```
+Content-Type: application/json
+Authorization: Bearer SUA_CHAVE
+```
+
+Corpo:
 
 ```json
 {
-  "model": "kokoro",
+  "model": "piper",
   "input": "Olá! Esta é a voz do Matheus AI.",
-  "voice": "pm_alex",
-  "response_format": "mp3"
+  "voice": "pt_BR-faber-medium",
+  "response_format": "wav"
 }
 ```
 
-Exemplo com cURL:
+Exemplo cURL:
 
 ```bash
 curl -X POST "https://SEU-SERVICO.onrender.com/v1/audio/speech" \
   -H "Content-Type: application/json" \
-  -d '{"model":"kokoro","input":"Olá! Esta é a voz do Matheus AI.","voice":"pm_alex","response_format":"mp3"}' \
-  --output matheus-ai.mp3
+  -H "Authorization: Bearer SUA_CHAVE" \
+  -d '{"model":"piper","input":"Olá! Esta é a voz do Matheus AI.","voice":"pt_BR-faber-medium","response_format":"wav"}' \
+  --output teste.wav
 ```
 
-### Documentação interativa
+A documentação interativa fica em `/docs`.
 
-Após o deploy, acesse:
+## Variáveis de ambiente
 
-`https://SEU-SERVICO.onrender.com/docs`
+| Nome | Obrigatória | Descrição |
+|---|---|---|
+| `PORT` | Não | Porta HTTP; padrão 10000 |
+| `PIPER_API_KEY` | Recomendada | Token Bearer para proteger a geração |
+| `PIPER_MODEL_PATH` | Não | Caminho do arquivo ONNX |
 
-Substitua `SEU-SERVICO` pelo nome real do serviço no Render.
-
-## Integração com o Matheus AI
-
-Configure o backend do Matheus AI para enviar requisições HTTP ao serviço:
-
-- Base URL: `https://SEU-SERVICO.onrender.com/v1`
-- Endpoint: `/audio/speech`
-- Model: `kokoro`
-- Voice: `pm_alex`
-- Formato recomendado: `mp3`
-
-A URL do serviço deve ficar em uma variável de ambiente no backend, por exemplo `KOKORO_TTS_URL`. Não coloque segredos ou credenciais no frontend.
+Não coloque a chave no frontend nem no GitHub. Guarde-a somente nas variáveis de ambiente do Render e do backend do Matheus AI.
 
 ## Observações
 
-- Este repositório contém a configuração do servidor; a integração no chat do Matheus AI é uma etapa separada.
-- Em hospedagem gratuita, o primeiro pedido após um período sem uso pode demorar devido ao cold start e ao carregamento do modelo.
-- A disponibilidade de vozes depende da imagem e da versão do Kokoro-FastAPI utilizadas.
+- O endpoint aceita textos de até 4.000 caracteres por solicitação.
+- Por segurança de memória e estabilidade, a síntese é serializada (uma requisição de áudio por vez).
+- A implementação retorna WAV; MP3 ainda não está habilitado.
+- O modelo ONNX e seu arquivo `.onnx.json` correspondente são necessários.
+- O motor Piper é distribuído sob GPL-3.0-or-later. Verifique as obrigações da licença antes de distribuir uma versão modificada ou incorporá-la a uma oferta comercial.
