@@ -1,4 +1,7 @@
+import asyncio
+import base64
 import io
+import json
 import logging
 import os
 import threading
@@ -8,7 +11,7 @@ from pathlib import Path
 
 import soundfile as sf
 from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from misaki.espeak import EspeakG2P
 from kokoro_onnx import Kokoro
 from pydantic import BaseModel, Field
@@ -25,6 +28,7 @@ SPEECH_SPEED = float(os.getenv("KOKORO_SPEED", "1.0"))
 kokoro = None
 g2p = None
 synthesis_lock = threading.Lock()
+stream_synthesis_lock = asyncio.Lock()
 
 
 @asynccontextmanager
@@ -75,6 +79,46 @@ def home():
         "model": MODEL_PATH.name,
         "format": "wav",
     }
+
+
+@app.post("/v1/audio/speech/stream")
+async def generate_speech_stream(data: SpeechRequest, authorization: str = Header(default="")):
+    if API_KEY and authorization != f"Bearer {API_KEY}":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if not data.input.strip():
+        raise HTTPException(status_code=400, detail="Texto vazio.")
+    if data.voice != VOICE_NAME:
+        raise HTTPException(status_code=400, detail=f"Voz não disponível. Use {VOICE_NAME}.")
+    if kokoro is None or g2p is None:
+        raise HTTPException(status_code=503, detail="Modelo ainda está carregando.")
+
+    async def audio_events():
+        try:
+            phonemes, _ = g2p(data.input.strip())
+            async with stream_synthesis_lock:
+                async for samples, sample_rate in kokoro.create_stream(
+                    phonemes,
+                    voice=VOICE_NAME,
+                    speed=data.speed,
+                    lang="pt-br",
+                    is_phonemes=True,
+                ):
+                    audio_buffer = io.BytesIO()
+                    sf.write(audio_buffer, samples, sample_rate, format="WAV", subtype="PCM_16")
+                    encoded = base64.b64encode(audio_buffer.getvalue()).decode("ascii")
+                    yield "data: " + json.dumps({"audio": encoded}, separators=(",", ":")) + "\\n\\n"
+            yield "event: done\\ndata: {}\\n\\n"
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Falha no streaming de áudio Kokoro")
+            yield "event: error\\ndata: {\"detail\":\"Falha ao sintetizar áudio.\"}\\n\\n"
+
+    return StreamingResponse(
+        audio_events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+    )
 
 
 @app.get("/health")
