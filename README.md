@@ -1,11 +1,11 @@
-# Matheus Kokoro TTS — teste pm_alex
+# Matheus Kokoro TTS — teste pf_dora
 
-Branch experimental para avaliar a voz masculina brasileira `pm_alex` do Kokoro-82M. A branch `main` permanece intacta com o serviço Piper atual.
+Branch experimental para avaliar a voz feminina brasileira `pf_dora` do Kokoro-82M. A branch `main` permanece intacta com o serviço Piper atual.
 
 ## Modelo e voz
 
 - Motor: Kokoro-82M via `kokoro-onnx`
-- Voz: `pm_alex` (masculina, português brasileiro)
+- Voz: `pf_dora` (masculina, português brasileiro)
 - Idioma/G2P: `pt-br` via Misaki/espeak-ng
 - Modelo: FP16, 163.527.961 bytes (~163,5 MB)
 - Pacote de embeddings: `voices-v1.0.bin`, 28.214.398 bytes (~28,2 MB)
@@ -13,7 +13,7 @@ Branch experimental para avaliar a voz masculina brasileira `pm_alex` do Kokoro-
 - Saída: WAV PCM 16-bit
 - API compatível com `POST /v1/audio/speech`
 
-Os arquivos são baixados durante o build e verificados por SHA-256. O arquivo de vozes contém vários perfis; o servidor só seleciona `pm_alex`.
+Os arquivos são baixados durante o build e verificados por SHA-256. O arquivo de vozes contém vários perfis; o servidor só seleciona `pf_dora`.
 
 ## Deploy experimental no Render
 
@@ -40,7 +40,7 @@ Exemplo:
 curl -X POST "https://SEU-SERVICO.onrender.com/v1/audio/speech" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer SUA_CHAVE" \
-  -d '{"model":"kokoro","input":"Olá! Eu sou o Matheus AI. Como posso ajudar você hoje?","voice":"pm_alex","response_format":"wav","speed":1.0}' \
+  -d '{"model":"kokoro","input":"Olá! Eu sou o Matheus AI. Como posso ajudar você hoje?","voice":"pf_dora","response_format":"wav","speed":1.0}' \
   --output teste-pm-alex.wav
 ```
 

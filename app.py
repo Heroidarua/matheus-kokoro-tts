@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("matheus-kokoro-tts")
 
-VOICE_NAME = "pm_alex"
+VOICE_NAME = "pf_dora"
 MODEL_PATH = Path(os.getenv("KOKORO_MODEL_PATH", "/app/models/kokoro-v1.0.fp16.onnx"))
 VOICES_PATH = Path(os.getenv("KOKORO_VOICES_PATH", "/app/models/voices-v1.0.bin"))
 API_KEY = os.getenv("TTS_API_KEY") or os.getenv("PIPER_API_KEY")
@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Matheus Kokoro TTS",
-    description="Síntese de voz em português brasileiro com Kokoro-82M e voz masculina pm_alex.",
+    description="Síntese de voz em português brasileiro com Kokoro-82M e voz feminina pf_dora.",
     version="2.0.0",
     lifespan=lifespan,
 )
